@@ -4,21 +4,26 @@ import { cn } from "@/lib/utils";
 import { LucideX } from "lucide-react";
 import { useRef, useState } from "react";
 
-// TODO: make tag separator an inputtable param
+// TODO: make component optionally controllable (value, onValueChange)
+// TODO: move between tags with arrow keys (how to handle this on mobile?)
+// TODO: add different tag removal flow for mobile (maybe a double tap where the first tap triggers shows the X)
 
 interface TagifyingInputProps {
   initialValue?: string[];
-
   onValueChange?: (newValue: string[]) => void;
+
+  /** The character at which a new tag is created using the current text inputted */
+  tagSeparator?: string;
 
   className?: string;
 }
 
-const TAG_SEPARATOR = " ";
+const DEFAULT_TAG_SEPARATOR = ",";
 
 export const TagifyingInput = ({
   initialValue,
   onValueChange,
+  tagSeparator,
   className,
 }: TagifyingInputProps) => {
   const [tags, setTags] = useState<string[]>(initialValue ?? []);
@@ -28,7 +33,7 @@ export const TagifyingInput = ({
   const onRawInputChange = (value: string) => {
     if (value.length < 2) return;
 
-    if (value.at(-1) === TAG_SEPARATOR) {
+    if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
       const newTagText = value.slice(0, value.length - 1);
 
       setTags((tags) => [...tags, newTagText]);
@@ -46,7 +51,7 @@ export const TagifyingInput = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 relative border p-2 rounded-md w-[500px] overflow-x-auto",
+        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto",
         className,
       )}
     >
@@ -55,7 +60,7 @@ export const TagifyingInput = ({
       ))}
 
       <input
-        className="border-none outline-none grow"
+        className="bg-transparent border-none outline-none grow"
         onChange={(event) => onRawInputChange(event.target.value)}
         ref={inputRef}
       />
@@ -77,7 +82,7 @@ function Tag({ text, onRemoved }: TagProps) {
         <input value={text} />
       ) : (
         <div
-          className="flex group relative px-3 hover:pl-1 hover:pr-5 transition-all py-0.5 bg-zinc-200 rounded-md text-zinc-800 cursor-pointer hover:bg-zinc-300 duration-75"
+          className="flex group relative px-3 hover:pl-1 hover:pr-5 transition-all py-0.5 bg-zinc-200 rounded-md text-zinc-800 cursor-pointer hover:bg-zinc-300 duration-75 whitespace-nowrap"
           onClick={onRemoved}
         >
           <span>{text}</span>
@@ -87,7 +92,7 @@ function Tag({ text, onRemoved }: TagProps) {
               opacity-0
               group-hover:opacity-100
               absolute
-              right-0
+              right-1
               top-[50%]
               translate-y-[-50%]
 
