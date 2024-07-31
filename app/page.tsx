@@ -8,7 +8,9 @@ export default function Home() {
       <div className="flex flex-col justify-center w-full max-w-[500px] gap-1">
         <label className="font-light">Tagifying Input</label>
 
-        <TagifyingInput />
+        <TagifyingInput
+          initialValue={["Tag1", "Tag2", "Tag3"]}
+        />
       </div>
 
       <div className="text-center w-full mt-16 flex flex-wrap gap-1 items-center justify-center">

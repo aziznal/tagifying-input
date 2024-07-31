@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { LucideX } from "lucide-react";
-import { useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 // TODO: make component optionally controllable (value, onValueChange)
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
@@ -29,6 +29,9 @@ export const TagifyingInput = ({
   const [tags, setTags] = useState<string[]>(initialValue ?? []);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const [focusedTagIndex, setFocusedTagIndex] = useState<number>(
+    initialValue?.length ?? 0,
+  );
 
   const onRawInputChange = (value: string) => {
     if (value.length < 2) return;
@@ -36,10 +39,16 @@ export const TagifyingInput = ({
     if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
       const newTagText = value.slice(0, value.length - 1);
 
-      setTags((tags) => [...tags, newTagText]);
+      setTags((tags) => tags.toSpliced(focusedTagIndex, 0, newTagText));
+
+      setFocusedTagIndex((i) => i + 1);
 
       if (inputRef.current) {
         inputRef.current.value = "";
+
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
       }
     }
   };
@@ -48,22 +57,83 @@ export const TagifyingInput = ({
     setTags((tags) => tags.toSpliced(tagIndex, 1));
   };
 
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto",
-        className,
-      )}
-    >
-      {tags.map((tag, i) => (
-        <Tag key={i} text={tag} onRemoved={() => removeTagAtIndex(i)} />
-      ))}
+  const removeLastTag = () => {
+    removeTagAtIndex(tags.length - 1);
+    setFocusedTagIndex((i) => Math.max(0, i - 1));
+  };
 
+  // cursor moves outside right edge of input
+  const moveToNextTag = () => {
+    if (focusedTagIndex >= tags.length) return;
+    setFocusedTagIndex((i) => Math.min(i + 1, tags.length - 1));
+  };
+
+  // cursor moves outside left edge of input
+  const moveToPrevTag = () => {
+    if (focusedTagIndex <= 0) return;
+    setFocusedTagIndex((i) => Math.max(0, i - 1));
+  };
+
+  // Cursor & Focus change
+  useEffect(() => {
+    if (!inputRef.current) return;
+
+    const handleCursorChange = (event: KeyboardEvent) => {
+      if (event.key === "ArrowRight") moveToNextTag();
+
+      if (event.key === "ArrowLeft") moveToPrevTag();
+
+      if (event.key === "Backspace") removeLastTag();
+
+      setTimeout(() => {
+        inputRef.current?.focus();
+      });
+    };
+
+    inputRef.current.addEventListener("keydown", handleCursorChange);
+
+    return () => {
+      inputRef.current?.removeEventListener("keydown", handleCursorChange);
+    };
+  }, [focusedTagIndex]);
+
+  const elements = {
+    tags: tags.map((tag, i) => (
+      <Tag key={i} text={tag} onRemoved={() => removeTagAtIndex(i)} />
+    )),
+    input: (
       <input
-        className="bg-transparent border-none outline-none grow"
+        className={cn("bg-transparent outline-none border")}
         onChange={(event) => onRawInputChange(event.target.value)}
         ref={inputRef}
       />
+    ),
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto focus-within:border-2",
+        className,
+      )}
+    >
+      {/* input is only element */}
+      {elements.tags.length === 0 && elements.input}
+
+      {elements.tags.map((tag, i) => {
+        return (
+          <Fragment key={i}>
+            {/* input is somewhere between tags */}
+            {focusedTagIndex === i && elements.input}
+            {tag}
+          </Fragment>
+        );
+      })}
+
+      {/* input is last element */}
+      {elements.tags.length !== 0 &&
+        elements.tags.length === focusedTagIndex &&
+        elements.input}
     </div>
   );
 };
