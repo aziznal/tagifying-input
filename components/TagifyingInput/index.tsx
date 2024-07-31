@@ -29,11 +29,16 @@ export const TagifyingInput = ({
   const [tags, setTags] = useState<string[]>(initialValue ?? []);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [rawInputValue, setRawInputValue] = useState<string>("");
+
   const [focusedTagIndex, setFocusedTagIndex] = useState<number>(
     initialValue?.length ?? 0,
   );
 
   const onRawInputChange = (value: string) => {
+    setRawInputValue(value);
+
     if (value.length < 2) return;
 
     if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
@@ -44,7 +49,7 @@ export const TagifyingInput = ({
       setFocusedTagIndex((i) => i + 1);
 
       if (inputRef.current) {
-        inputRef.current.value = "";
+        setRawInputValue("");
 
         setTimeout(() => {
           inputRef.current?.focus();
@@ -65,7 +70,7 @@ export const TagifyingInput = ({
   // cursor moves outside right edge of input
   const moveToNextTag = () => {
     if (focusedTagIndex >= tags.length) return;
-    setFocusedTagIndex((i) => Math.min(i + 1, tags.length - 1));
+    setFocusedTagIndex((i) => Math.min(i + 1, tags.length));
   };
 
   // cursor moves outside left edge of input
@@ -79,11 +84,17 @@ export const TagifyingInput = ({
     if (!inputRef.current) return;
 
     const handleCursorChange = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight") moveToNextTag();
+      if (!inputRef.current) return;
 
-      if (event.key === "ArrowLeft") moveToPrevTag();
+      const cursorOffset = inputRef.current.selectionStart;
+      const cursorIsAtEnd = cursorOffset === rawInputValue.length;
+      const cursorIsAtStart = cursorOffset === 0;
 
-      if (event.key === "Backspace") removeLastTag();
+      if (cursorIsAtEnd && event.key === "ArrowRight") moveToNextTag();
+
+      if (cursorIsAtStart && event.key === "ArrowLeft") moveToPrevTag();
+
+      if (cursorIsAtStart && event.key === "Backspace") removeLastTag();
 
       setTimeout(() => {
         inputRef.current?.focus();
@@ -105,6 +116,7 @@ export const TagifyingInput = ({
       <input
         className={cn("bg-transparent outline-none border")}
         onChange={(event) => onRawInputChange(event.target.value)}
+        value={rawInputValue}
         ref={inputRef}
       />
     ),
