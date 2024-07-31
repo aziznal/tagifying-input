@@ -5,8 +5,8 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center p-4">
-      <div className="flex flex-col justify-center w-full max-w-[500px]">
-        <label className="text-sm font-light">Tagifying Input</label>
+      <div className="flex flex-col justify-center w-full max-w-[500px] gap-1">
+        <label className="font-light">Tagifying Input</label>
 
         <TagifyingInput />
       </div>
