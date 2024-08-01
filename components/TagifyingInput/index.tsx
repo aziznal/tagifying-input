@@ -94,7 +94,7 @@ export const TagifyingInput = ({
 
       if (cursorIsAtStart && event.key === "ArrowLeft") moveToPrevTag();
 
-      if (cursorIsAtStart && event.key === "Backspace") removeLastTag();
+      if (cursorIsAtStart && event.key === "Backspace") removeTagAtIndex(focusedTagIndex - 1);
 
       setTimeout(() => {
         inputRef.current?.focus();
