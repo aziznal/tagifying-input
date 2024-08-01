@@ -1,8 +1,8 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { clamp, cn } from "@/lib/utils";
 import { LucideX } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 // TODO: make component optionally controllable (value, onValueChange)
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
@@ -62,22 +62,26 @@ export const TagifyingInput = ({
     setTags((tags) => tags.toSpliced(tagIndex, 1));
   };
 
-  const removeLastTag = () => {
-    removeTagAtIndex(tags.length - 1);
-    setFocusedTagIndex((i) => Math.max(0, i - 1));
-  };
-
   // cursor moves outside right edge of input
   const moveToNextTag = () => {
     if (focusedTagIndex >= tags.length) return;
-    setFocusedTagIndex((i) => Math.min(i + 1, tags.length));
+    setFocusedTagIndex((i) => i + 1);
   };
 
   // cursor moves outside left edge of input
   const moveToPrevTag = () => {
     if (focusedTagIndex <= 0) return;
-    setFocusedTagIndex((i) => Math.max(0, i - 1));
+    setFocusedTagIndex((i) => i - 1);
   };
+
+  /** keeping focused-index in check after every change to the tags array */
+  useEffect(() => {
+    setFocusedTagIndex((i) => clamp(i, 0, tags.length));
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    });
+  }, [tags]);
 
   // Cursor & Focus change
   useEffect(() => {
@@ -94,7 +98,8 @@ export const TagifyingInput = ({
 
       if (cursorIsAtStart && event.key === "ArrowLeft") moveToPrevTag();
 
-      if (cursorIsAtStart && event.key === "Backspace") removeTagAtIndex(focusedTagIndex - 1);
+      if (cursorIsAtStart && event.key === "Backspace")
+        removeTagAtIndex(focusedTagIndex - 1);
 
       setTimeout(() => {
         inputRef.current?.focus();
@@ -114,7 +119,14 @@ export const TagifyingInput = ({
     )),
     input: (
       <input
-        className={cn("bg-transparent outline-none border")}
+        className={cn(
+          "bg-transparent outline-none",
+          focusedTagIndex !== 0 && focusedTagIndex === tags.length
+            ? // input is last element
+              "grow"
+            : // input is at beginning or in center
+              "w-[10px]",
+        )}
         onChange={(event) => onRawInputChange(event.target.value)}
         value={rawInputValue}
         ref={inputRef}
@@ -125,9 +137,12 @@ export const TagifyingInput = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto focus-within:border-2",
+        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto focus-within:border-2 cursor-text",
         className,
       )}
+      onClick={() => {
+        inputRef.current?.focus();
+      }}
     >
       {/* input is only element */}
       {elements.tags.length === 0 && elements.input}
