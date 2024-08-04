@@ -1,3 +1,5 @@
+"use client";
+
 import { Footer } from "@/components/Footer";
 import { TagifyingInput } from "@/components/TagifyingInput";
 
@@ -7,7 +9,12 @@ export default function Home() {
       <div className="flex flex-col justify-center w-full max-w-[500px] gap-1">
         <label className="font-light">Tagifying Input</label>
 
-        <TagifyingInput initialValue={["Tag1", "Tag2", "Tag3"]} />
+        <TagifyingInput
+          initialValue={["Tag1", "Tag2", "Tag3"]}
+          onValueChange={(newTags) => {
+            console.log(newTags);
+          }}
+        />
       </div>
 
       <Footer />

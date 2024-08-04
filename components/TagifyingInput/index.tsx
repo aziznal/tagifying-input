@@ -4,7 +4,6 @@ import { clamp, cn } from "@/lib/utils";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Tag } from "./Tag";
 
-// TODO: make component optionally controllable (value, onValueChange)
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
 // TODO: add different tag removal flow for mobile (maybe a double tap where the first tap triggers shows the X)
 // TODO: add drag-n-drop re-ordering for tags.
@@ -13,11 +12,17 @@ import { Tag } from "./Tag";
 
 // BUG: on mobile, focusing / unfocusing the input causes keyboards
 // to go and come back. This is particularly present after:
+//
 //  - writing the first tag
+//
 //  - after deleting the last remaining tag.
 
-// Optimizations / Improvements:
-// use strategy pattern for tag separation method?
+// Optimizations / Improvements / Ambitions that'll never actually happen probably:
+//
+//  - use strategy pattern for tag separation method?
+//
+//  - making component controllable (problematic part is the side-effects 
+//    generated at/after manipulationg tags.)
 
 interface TagifyingInputProps {
   initialValue?: string[];
@@ -39,7 +44,6 @@ const DEFAULT_TAG_SEPARATOR = ",";
  * - Navigation with the arrow keys
  * - Deleting specific tags with cursor or by clicking on tag
  * - Wrappable container
- * - Controllable input (`value`, `onValueChange`)
  *
  * Remove the `flex-wrap` tailwind class from the main wrapping div to prevent wrapping
  */
@@ -68,7 +72,13 @@ export const TagifyingInput = ({
     if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
       const newTagText = value.slice(0, value.length - 1);
 
-      setTags((tags) => tags.toSpliced(focusedTagIndex, 0, newTagText));
+      setTags((tags) => {
+        const updatedTags = tags.toSpliced(focusedTagIndex, 0, newTagText);
+
+        onValueChange?.(updatedTags);
+
+        return updatedTags;
+      });
 
       setFocusedTagIndex((i) => i + 1);
 
@@ -84,7 +94,13 @@ export const TagifyingInput = ({
   };
 
   const removeTagAtIndex = (tagIndex: number) => {
-    setTags((tags) => tags.toSpliced(tagIndex, 1));
+    setTags((tags) => {
+      const updatedTags = tags.toSpliced(tagIndex, 1);
+
+      onValueChange?.(updatedTags);
+
+      return updatedTags;
+    });
   };
 
   // cursor moves outside right edge of input
