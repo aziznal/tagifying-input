@@ -1,13 +1,23 @@
 "use client";
 
 import { clamp, cn } from "@/lib/utils";
-import { LucideX } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Tag } from "./Tag";
 
 // TODO: make component optionally controllable (value, onValueChange)
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
 // TODO: add different tag removal flow for mobile (maybe a double tap where the first tap triggers shows the X)
 // TODO: add drag-n-drop re-ordering for tags.
+// TODO: allow focusing between tags with the mouse
+// TODO: allow editable tags
+
+// BUG: on mobile, focusing / unfocusing the input causes keyboards
+// to go and come back. This is particularly present after:
+//  - writing the first tag
+//  - after deleting the last remaining tag.
+
+// Optimizations / Improvements:
+// use strategy pattern for tag separation method?
 
 interface TagifyingInputProps {
   initialValue?: string[];
@@ -21,6 +31,18 @@ interface TagifyingInputProps {
 
 const DEFAULT_TAG_SEPARATOR = ",";
 
+/**
+ * An advanced tag-input.
+ *
+ * Features:
+ * - Creating tags
+ * - Navigation with the arrow keys
+ * - Deleting specific tags with cursor or by clicking on tag
+ * - Wrappable container
+ * - Controllable input (`value`, `onValueChange`)
+ *
+ * Remove the `flex-wrap` tailwind class from the main wrapping div to prevent wrapping
+ */
 export const TagifyingInput = ({
   initialValue,
   onValueChange,
@@ -153,7 +175,24 @@ export const TagifyingInput = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 border p-2 pr-32 rounded-md overflow-x-auto focus-within:border-2 cursor-text",
+        `flex
+        flex-wrap
+        items-center
+        gap-1
+        border
+        p-2
+        pr-32
+        rounded-md
+        overflow-x-auto
+
+        hover:outline
+        hover:outline-1
+        hover:outline-zinc-400
+        focus-within:outline
+        focus-within:outline-1
+        focus-within:outline-zinc-400
+
+        cursor-text`,
         className,
       )}
       onClick={() => {
@@ -180,47 +219,3 @@ export const TagifyingInput = ({
     </div>
   );
 };
-
-interface TagProps {
-  text: string;
-  onRemoved?: () => void;
-}
-
-function Tag({ text, onRemoved }: TagProps) {
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <>
-      {isFocused ? (
-        <input value={text} />
-      ) : (
-        <div
-          className="flex group relative px-3 hover:pl-1 hover:pr-5 transition-all py-0.5 bg-zinc-200 rounded-md text-zinc-800 cursor-pointer hover:bg-zinc-300 duration-75 whitespace-nowrap"
-          onClick={onRemoved}
-        >
-          <span>{text}</span>
-
-          <span
-            className={cn(`
-              opacity-0
-              group-hover:opacity-100
-              absolute
-              right-1
-              top-[50%]
-              translate-y-[-50%]
-
-              text-zinc-500
-              bg-zinc-300
-
-              rounded-md
-              transition-all
-              duration-75
-`)}
-          >
-            <LucideX size={16} />
-          </span>
-        </div>
-      )}
-    </>
-  );
-}
