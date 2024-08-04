@@ -1,7 +1,14 @@
 "use client";
 
 import { clamp, cn } from "@/lib/utils";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Tag } from "./Tag";
 
 // TODO: make component optionally controllable (value, onValueChange)
@@ -21,6 +28,7 @@ import { Tag } from "./Tag";
 
 interface TagifyingInputProps {
   initialValue?: string[];
+  value?: string[];
   onValueChange?: (newValue: string[]) => void;
 
   /** The character at which a new tag is created using the current text inputted */
@@ -45,11 +53,33 @@ const DEFAULT_TAG_SEPARATOR = ",";
  */
 export const TagifyingInput = ({
   initialValue,
+  value,
   onValueChange,
   tagSeparator,
   className,
 }: TagifyingInputProps) => {
-  const [tags, setTags] = useState<string[]>(initialValue ?? []);
+  const isControlled = value !== undefined;
+
+  // internal state
+  const [_tags, _setTags] = useState<string[]>(
+    isControlled ? value : initialValue ?? [],
+  );
+
+  /** returns controlled external state if component is controlled, otherwise returns internal state */
+  const tags = useMemo(() => {
+    if (isControlled) return value;
+
+    return _tags;
+  }, [_tags, isControlled, value]);
+
+  const setTags = useCallback(
+    (newTags: string[]) => {
+      if (isControlled) return onValueChange?.(newTags);
+
+      _setTags(newTags);
+    },
+    [isControlled, onValueChange],
+  );
 
   const inputRef = useRef<HTMLInputElement>(null);
   const inputTextRef = useRef<HTMLSpanElement>(null);
@@ -60,15 +90,18 @@ export const TagifyingInput = ({
     initialValue?.length ?? 0,
   );
 
-  const onRawInputChange = (value: string) => {
-    setRawInputValue(value);
+  const onRawInputChange = (inputValue: string) => {
+    setRawInputValue(inputValue);
 
-    if (value.length < 2) return;
+    if (inputValue.length < 2) return;
 
-    if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
-      const newTagText = value.slice(0, value.length - 1);
+    if (inputValue.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
+      // text without the separator included
+      const newTagText = inputValue.slice(0, inputValue.length - 1);
 
-      setTags((tags) => tags.toSpliced(focusedTagIndex, 0, newTagText));
+      const updatedTags = tags.toSpliced(focusedTagIndex, 0, newTagText);
+
+      setTags(updatedTags);
 
       setFocusedTagIndex((i) => i + 1);
 
@@ -83,14 +116,30 @@ export const TagifyingInput = ({
     }
   };
 
-  const removeTagAtIndex = (tagIndex: number) => {
-    setTags((tags) => tags.toSpliced(tagIndex, 1));
-  };
+  // if `value` prop is given i.e. component is *controlled*
+  useEffect(() => {
+    if (value === undefined) {
+      return;
+    }
+
+    // internal setState must be used to avoid an infinte re-render loop
+    _setTags(value);
+  }, [value]);
+
+  const removeTagAtIndex = useCallback(
+    (tagIndex: number) => {
+      const updatedTags = tags.toSpliced(tagIndex, 1);
+      setTags(updatedTags);
+    },
+    [setTags, tags],
+  );
 
   // cursor moves outside right edge of input
   const moveToNextTag = useCallback(() => {
     if (focusedTagIndex >= tags.length) return;
+
     setFocusedTagIndex((i) => i + 1);
+
     setTimeout(() => {
       inputRef.current?.focus();
     });
@@ -99,7 +148,9 @@ export const TagifyingInput = ({
   // cursor moves outside left edge of input
   const moveToPrevTag = useCallback(() => {
     if (focusedTagIndex <= 0) return;
+
     setFocusedTagIndex((i) => i - 1);
+
     setTimeout(() => {
       inputRef.current?.focus();
     });
@@ -144,7 +195,13 @@ export const TagifyingInput = ({
     return () => {
       inputElement.removeEventListener("keydown", handleCursorChange);
     };
-  }, [focusedTagIndex, moveToNextTag, moveToPrevTag, rawInputValue.length]);
+  }, [
+    focusedTagIndex,
+    moveToNextTag,
+    moveToPrevTag,
+    rawInputValue.length,
+    removeTagAtIndex,
+  ]);
 
   const elements = {
     tags: tags.map((tag, i) => (
