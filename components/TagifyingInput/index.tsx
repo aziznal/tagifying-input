@@ -7,6 +7,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 // TODO: make component optionally controllable (value, onValueChange)
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
 // TODO: add different tag removal flow for mobile (maybe a double tap where the first tap triggers shows the X)
+// TODO: add drag-n-drop re-ordering for tags.
 
 interface TagifyingInputProps {
   initialValue?: string[];
@@ -29,6 +30,7 @@ export const TagifyingInput = ({
   const [tags, setTags] = useState<string[]>(initialValue ?? []);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputTextRef = useRef<HTMLSpanElement>(null);
 
   const [rawInputValue, setRawInputValue] = useState<string>("");
 
@@ -50,10 +52,11 @@ export const TagifyingInput = ({
 
       if (inputRef.current) {
         setRawInputValue("");
+        if (inputTextRef.current) inputTextRef.current.textContent = "";
 
         setTimeout(() => {
           inputRef.current?.focus();
-        }, 0);
+        });
       }
     }
   };
@@ -63,16 +66,22 @@ export const TagifyingInput = ({
   };
 
   // cursor moves outside right edge of input
-  const moveToNextTag = () => {
+  const moveToNextTag = useCallback(() => {
     if (focusedTagIndex >= tags.length) return;
     setFocusedTagIndex((i) => i + 1);
-  };
+    setTimeout(() => {
+      inputRef.current?.focus();
+    });
+  }, [focusedTagIndex, tags.length]);
 
   // cursor moves outside left edge of input
-  const moveToPrevTag = () => {
+  const moveToPrevTag = useCallback(() => {
     if (focusedTagIndex <= 0) return;
     setFocusedTagIndex((i) => i - 1);
-  };
+    setTimeout(() => {
+      inputRef.current?.focus();
+    });
+  }, [focusedTagIndex]);
 
   /** keeping focused-index in check after every change to the tags array */
   useEffect(() => {
@@ -81,16 +90,16 @@ export const TagifyingInput = ({
     setTimeout(() => {
       inputRef.current?.focus();
     });
-  }, [tags]);
+  }, [tags.length]);
 
   // Cursor & Focus change
   useEffect(() => {
-    if (!inputRef.current) return;
+    const inputElement = inputRef.current;
+
+    if (!inputElement) return;
 
     const handleCursorChange = (event: KeyboardEvent) => {
-      if (!inputRef.current) return;
-
-      const cursorOffset = inputRef.current.selectionStart;
+      const cursorOffset = inputElement.selectionStart;
       const cursorIsAtEnd = cursorOffset === rawInputValue.length;
       const cursorIsAtStart = cursorOffset === 0;
 
@@ -98,46 +107,53 @@ export const TagifyingInput = ({
 
       if (cursorIsAtStart && event.key === "ArrowLeft") moveToPrevTag();
 
-      if (cursorIsAtStart && event.key === "Backspace")
+      if (cursorIsAtStart && event.key === "Backspace") {
         removeTagAtIndex(focusedTagIndex - 1);
+        setFocusedTagIndex(focusedTagIndex - 1);
+      }
 
       setTimeout(() => {
-        inputRef.current?.focus();
+        inputElement.focus();
       });
     };
 
-    inputRef.current.addEventListener("keydown", handleCursorChange);
+    inputElement.addEventListener("keydown", handleCursorChange);
 
     return () => {
-      inputRef.current?.removeEventListener("keydown", handleCursorChange);
+      inputElement.removeEventListener("keydown", handleCursorChange);
     };
-  }, [focusedTagIndex]);
+  }, [focusedTagIndex, moveToNextTag, moveToPrevTag, rawInputValue.length]);
 
   const elements = {
     tags: tags.map((tag, i) => (
       <Tag key={i} text={tag} onRemoved={() => removeTagAtIndex(i)} />
     )),
     input: (
-      <input
-        className={cn(
-          "bg-transparent outline-none",
-          focusedTagIndex !== 0 && focusedTagIndex === tags.length
-            ? // input is last element
-              "grow"
-            : // input is at beginning or in center
-              "w-[10px]",
-        )}
-        onChange={(event) => onRawInputChange(event.target.value)}
-        value={rawInputValue}
-        ref={inputRef}
-      />
+      <div>
+        <input
+          className={cn("bg-transparent outline-none")}
+          style={{
+            width: `${(inputTextRef.current?.clientWidth ?? 10) + 20}px`,
+          }}
+          onChange={(event) => onRawInputChange(event.target.value)}
+          value={rawInputValue}
+          ref={inputRef}
+        />
+
+        <span
+          ref={inputTextRef}
+          className="w-fit absolute pointer-events-none cursor-none opacity-0"
+        >
+          {rawInputValue}
+        </span>
+      </div>
     ),
   };
 
   return (
     <div
       className={cn(
-        "flex items-center gap-1 relative border p-2 rounded-md overflow-x-auto focus-within:border-2 cursor-text",
+        "flex items-center gap-1 border p-2 pr-32 rounded-md overflow-x-auto focus-within:border-2 cursor-text",
         className,
       )}
       onClick={() => {
