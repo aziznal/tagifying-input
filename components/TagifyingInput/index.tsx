@@ -7,8 +7,8 @@ import { Tag } from "./Tag";
 // TODO: move between tags with arrow keys (how to handle this on mobile?)
 // TODO: add different tag removal flow for mobile (maybe a double tap where the first tap triggers shows the X)
 // TODO: add drag-n-drop re-ordering for tags.
-// TODO: allow focusing between tags with the mouse
 // TODO: allow editable tags
+// TODO: add flags for toggling ability for movement between tags, re-ordering tags, etc.
 
 // BUG: on mobile, focusing / unfocusing the input causes keyboards
 // to go and come back. This is particularly present after:
@@ -21,8 +21,13 @@ import { Tag } from "./Tag";
 //
 //  - use strategy pattern for tag separation method?
 //
-//  - making component controllable (problematic part is the side-effects 
+//  - making component controllable (problematic part is the side-effects
 //    generated at/after manipulationg tags.)
+
+// BUG: deleting a whole word also deletes the previous tag.
+//      Can be reproduced by typing something, pressing ctrl-a, then backspace.
+
+// FIXME: flickering focus effect when moving between tags
 
 interface TagifyingInputProps {
   initialValue?: string[];
@@ -44,6 +49,7 @@ const DEFAULT_TAG_SEPARATOR = ",";
  * - Navigation with the arrow keys
  * - Deleting specific tags with cursor or by clicking on tag
  * - Wrappable container
+ * - Focusing between tags with mouse / clicks
  *
  * Remove the `flex-wrap` tailwind class from the main wrapping div to prevent wrapping
  */
@@ -93,15 +99,18 @@ export const TagifyingInput = ({
     }
   };
 
-  const removeTagAtIndex = (tagIndex: number) => {
-    setTags((tags) => {
-      const updatedTags = tags.toSpliced(tagIndex, 1);
+  const removeTagAtIndex = useCallback(
+    (tagIndex: number) => {
+      setTags((tags) => {
+        const updatedTags = tags.toSpliced(tagIndex, 1);
 
-      onValueChange?.(updatedTags);
+        onValueChange?.(updatedTags);
 
-      return updatedTags;
-    });
-  };
+        return updatedTags;
+      });
+    },
+    [onValueChange],
+  );
 
   // cursor moves outside right edge of input
   const moveToNextTag = useCallback(() => {
@@ -160,7 +169,13 @@ export const TagifyingInput = ({
     return () => {
       inputElement.removeEventListener("keydown", handleCursorChange);
     };
-  }, [focusedTagIndex, moveToNextTag, moveToPrevTag, rawInputValue.length]);
+  }, [
+    focusedTagIndex,
+    moveToNextTag,
+    moveToPrevTag,
+    rawInputValue.length,
+    removeTagAtIndex,
+  ]);
 
   const elements = {
     tags: tags.map((tag, i) => (
@@ -194,7 +209,6 @@ export const TagifyingInput = ({
         `flex
         flex-wrap
         items-center
-        gap-1
         border
         p-2
         pr-32
@@ -212,7 +226,11 @@ export const TagifyingInput = ({
         className,
       )}
       onClick={() => {
-        inputRef.current?.focus();
+        // set focus after last tag if tag-input body is clicked randomly
+        setFocusedTagIndex(tags.length);
+        setTimeout(() => {
+          inputRef.current?.focus();
+        });
       }}
     >
       {/* input is only element */}
@@ -221,8 +239,38 @@ export const TagifyingInput = ({
       {elements.tags.map((tag, i) => {
         return (
           <Fragment key={i}>
-            {/* input is somewhere between tags */}
-            {focusedTagIndex === i && elements.input}
+            {focusedTagIndex === i && (
+              <>
+                {inputRef.current?.value?.length === 0 && (
+                  <div className="ml-2 self-stretch w-[1px] bg-blue-500 pointer-events-none" />
+                )}
+
+                {/* input is somewhere between tags */}
+                <div
+                  className={cn(
+                    inputRef.current?.value?.length !== 0 && "ml-2",
+                  )}
+                >
+                  {elements.input}
+                </div>
+              </>
+            )}
+
+            {focusedTagIndex !== i && (
+              <div
+                className="self-stretch w-[8px]"
+                onClick={(event) => {
+                  // to prevent from triggering parent and hence setting focus after last tag
+                  event.stopPropagation();
+
+                  setFocusedTagIndex(i);
+                  setTimeout(() => {
+                    inputRef.current?.focus();
+                  });
+                }}
+              />
+            )}
+
             {tag}
           </Fragment>
         );
@@ -230,8 +278,9 @@ export const TagifyingInput = ({
 
       {/* input is last element */}
       {elements.tags.length !== 0 &&
-        elements.tags.length === focusedTagIndex &&
-        elements.input}
+        elements.tags.length === focusedTagIndex && (
+          <div className="ml-2">{elements.input}</div>
+        )}
     </div>
   );
 };
