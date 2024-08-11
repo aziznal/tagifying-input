@@ -27,8 +27,6 @@ import { Tag } from "./Tag";
 // BUG: deleting a whole word also deletes the previous tag.
 //      Can be reproduced by typing something, pressing ctrl-a, then backspace.
 
-// FIXME: flickering focus effect when moving between tags
-
 interface TagifyingInputProps {
   initialValue?: string[];
   onValueChange?: (newValue: string[]) => void;
@@ -272,9 +270,8 @@ export const TagifyingInput = ({
 
       {/* input is last element */}
       {elements.tags.length !== 0 &&
-        elements.tags.length === focusedTagIndex && (
-          <div className="ml-2">{elements.input}</div>
-        )}
+        elements.tags.length === focusedTagIndex &&
+        elements.input}
     </div>
   );
 };
