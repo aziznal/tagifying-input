@@ -215,6 +215,8 @@ export const TagifyingInput = ({
         rounded-md
         overflow-x-auto
 
+        gap-1
+
         hover:outline
         hover:outline-1
         hover:outline-zinc-400
@@ -239,39 +241,31 @@ export const TagifyingInput = ({
       {elements.tags.map((tag, i) => {
         return (
           <Fragment key={i}>
-            {focusedTagIndex === i && (
-              <>
-                {inputRef.current?.value?.length === 0 && (
-                  <div className="ml-2 self-stretch w-[1px] bg-blue-500 pointer-events-none" />
-                )}
+            {focusedTagIndex === i &&
+              // input is somewhere between tags
+              elements.input}
 
-                {/* input is somewhere between tags */}
+            {/* this is a div to make sure contained elements wrap to next lines together */}
+            <div className="flex relative">
+              {/* element for allowing focusing on a tag by clicking in front of it. */}
+              {focusedTagIndex !== i && (
                 <div
-                  className={cn(
-                    inputRef.current?.value?.length !== 0 && "ml-2",
-                  )}
-                >
-                  {elements.input}
-                </div>
-              </>
-            )}
+                  className="self-stretch absolute -left-[10%] h-full top-0 w-[8px]"
+                  onClick={(event) => {
+                    // to prevent from triggering parent and hence setting focus after last tag
+                    event.stopPropagation();
 
-            {focusedTagIndex !== i && (
-              <div
-                className="self-stretch w-[8px]"
-                onClick={(event) => {
-                  // to prevent from triggering parent and hence setting focus after last tag
-                  event.stopPropagation();
+                    setFocusedTagIndex(i);
+                    setTimeout(() => {
+                      inputRef.current?.focus();
+                    });
+                  }}
+                />
+              )}
 
-                  setFocusedTagIndex(i);
-                  setTimeout(() => {
-                    inputRef.current?.focus();
-                  });
-                }}
-              />
-            )}
-
-            {tag}
+              {/* The tag - here so your eyes don't gloss over it. */}
+              {tag}
+            </div>
           </Fragment>
         );
       })}
