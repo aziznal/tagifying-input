@@ -24,9 +24,6 @@ import { Tag } from "./Tag";
 //  - making component controllable (problematic part is the side-effects
 //    generated at/after manipulationg tags.)
 
-// BUG: deleting a whole word also deletes the previous tag.
-//      Can be reproduced by typing something, pressing ctrl-a, then backspace.
-
 interface TagifyingInputProps {
   initialValue?: string[];
   onValueChange?: (newValue: string[]) => void;
@@ -59,41 +56,57 @@ export const TagifyingInput = ({
 }: TagifyingInputProps) => {
   const [tags, setTags] = useState<string[]>(initialValue ?? []);
 
+  /** keeps track of the input where the user inputs text */
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /** keeps track of a hidden element used to manipulate the main input */
   const inputTextRef = useRef<HTMLSpanElement>(null);
 
+  /** controls the value of the main input */
   const [rawInputValue, setRawInputValue] = useState<string>("");
 
-  const [focusedTagIndex, setFocusedTagIndex] = useState<number>(
+  /** the index of the tag the cursor is currently at */
+  const [cursorIndex, setCursorIndex] = useState<number>(
     initialValue?.length ?? 0,
   );
+
+  const isMatchingTagSeparator = (value?: string): boolean => {
+    return value === (tagSeparator ?? DEFAULT_TAG_SEPARATOR);
+  };
 
   const onRawInputChange = (value: string) => {
     setRawInputValue(value);
 
     if (value.length < 2) return;
 
-    if (value.at(-1) === (tagSeparator ?? DEFAULT_TAG_SEPARATOR)) {
-      const newTagText = value.slice(0, value.length - 1);
+    if (!isMatchingTagSeparator(value.at(-1))) return;
 
-      setTags((tags) => {
-        const updatedTags = tags.toSpliced(focusedTagIndex, 0, newTagText);
+    createNewTag(value);
+  };
 
-        onValueChange?.(updatedTags);
+  const createNewTag = (value: string) => {
+    const newTagText = value.slice(0, value.length - 1);
 
-        return updatedTags;
+    setTags((tags) => {
+      const updatedTags = tags.toSpliced(cursorIndex, 0, newTagText);
+
+      onValueChange?.(updatedTags);
+
+      return updatedTags;
+    });
+
+    // wherever the cursor is, it should focus on the next index after successfully adding a tag
+    setCursorIndex((i) => i + 1);
+
+    // clear and re-focus input (since it's pos will change after a new tag is added)
+    if (inputRef.current) {
+      setRawInputValue("");
+
+      if (inputTextRef.current) inputTextRef.current.textContent = "";
+
+      setTimeout(() => {
+        inputRef.current?.focus();
       });
-
-      setFocusedTagIndex((i) => i + 1);
-
-      if (inputRef.current) {
-        setRawInputValue("");
-        if (inputTextRef.current) inputTextRef.current.textContent = "";
-
-        setTimeout(() => {
-          inputRef.current?.focus();
-        });
-      }
     }
   };
 
@@ -112,26 +125,31 @@ export const TagifyingInput = ({
 
   // cursor moves outside right edge of input
   const moveToNextTag = useCallback(() => {
-    if (focusedTagIndex >= tags.length) return;
-    setFocusedTagIndex((i) => i + 1);
+    if (cursorIndex >= tags.length) return;
+
+    setCursorIndex((i) => i + 1);
+
     setTimeout(() => {
       inputRef.current?.focus();
     });
-  }, [focusedTagIndex, tags.length]);
+  }, [cursorIndex, tags.length]);
 
   // cursor moves outside left edge of input
   const moveToPrevTag = useCallback(() => {
-    if (focusedTagIndex <= 0) return;
-    setFocusedTagIndex((i) => i - 1);
+    if (cursorIndex <= 0) return;
+
+    setCursorIndex((i) => i - 1);
+
     setTimeout(() => {
       inputRef.current?.focus();
     });
-  }, [focusedTagIndex]);
+  }, [cursorIndex]);
 
   /** keeping focused-index in check after every change to the tags array */
   useEffect(() => {
-    setFocusedTagIndex((i) => clamp(i, 0, tags.length));
+    setCursorIndex((i) => clamp(i, 0, tags.length));
 
+    // NOTE: this constant re-focus is potentially problematic
     setTimeout(() => {
       inputRef.current?.focus();
     });
@@ -148,13 +166,21 @@ export const TagifyingInput = ({
       const cursorIsAtEnd = cursorOffset === rawInputValue.length;
       const cursorIsAtStart = cursorOffset === 0;
 
+      const isRangeSelected =
+        (inputElement.selectionEnd ?? 0) -
+          (inputElement.selectionStart ?? 0) !==
+        0;
+
       if (cursorIsAtEnd && event.key === "ArrowRight") moveToNextTag();
 
       if (cursorIsAtStart && event.key === "ArrowLeft") moveToPrevTag();
 
-      if (cursorIsAtStart && event.key === "Backspace") {
-        removeTagAtIndex(focusedTagIndex - 1);
-        setFocusedTagIndex(focusedTagIndex - 1);
+      // checking for whether a range is selected because if the entire current input value
+      // is selected (with ctrl/cmd + a, for example), then clicking backspace removes the
+      // prev tag as well which is likely unintended behavior.
+      if (cursorIsAtStart && event.key === "Backspace" && !isRangeSelected) {
+        removeTagAtIndex(cursorIndex - 1);
+        setCursorIndex(cursorIndex - 1);
       }
 
       setTimeout(() => {
@@ -168,7 +194,7 @@ export const TagifyingInput = ({
       inputElement.removeEventListener("keydown", handleCursorChange);
     };
   }, [
-    focusedTagIndex,
+    cursorIndex,
     moveToNextTag,
     moveToPrevTag,
     rawInputValue.length,
@@ -227,7 +253,7 @@ export const TagifyingInput = ({
       )}
       onClick={() => {
         // set focus after last tag if tag-input body is clicked randomly
-        setFocusedTagIndex(tags.length);
+        setCursorIndex(tags.length);
         setTimeout(() => {
           inputRef.current?.focus();
         });
@@ -239,21 +265,21 @@ export const TagifyingInput = ({
       {elements.tags.map((tag, i) => {
         return (
           <Fragment key={i}>
-            {focusedTagIndex === i &&
+            {cursorIndex === i &&
               // input is somewhere between tags
               elements.input}
 
             {/* this is a div to make sure contained elements wrap to next lines together */}
             <div className="flex relative">
               {/* element for allowing focusing on a tag by clicking in front of it. */}
-              {focusedTagIndex !== i && (
+              {cursorIndex !== i && (
                 <div
                   className="self-stretch absolute -left-[10%] h-full top-0 w-[8px]"
                   onClick={(event) => {
                     // to prevent from triggering parent and hence setting focus after last tag
                     event.stopPropagation();
 
-                    setFocusedTagIndex(i);
+                    setCursorIndex(i);
                     setTimeout(() => {
                       inputRef.current?.focus();
                     });
@@ -270,7 +296,7 @@ export const TagifyingInput = ({
 
       {/* input is last element */}
       {elements.tags.length !== 0 &&
-        elements.tags.length === focusedTagIndex &&
+        elements.tags.length === cursorIndex &&
         elements.input}
     </div>
   );
